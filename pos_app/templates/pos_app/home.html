@@ -1,0 +1,42 @@
+<!-- Extend the base template to inherit common layout and navigation -->
+{% extends 'pos_app/base.html' %}
+
+<!-- Set the page title for the browser tab -->
+{% block title %}Home - Point Of Sales System{% endblock %}
+
+<!-- Main content block that will be inserted into the base template -->
+{% block content %}
+<!-- Use Bootstrap grid system for layout -->
+<div class="row">
+    <!-- Full width column for homepage content -->
+    <div class="col-md-12">
+        <!-- Bootstrap jumbotron component for prominent display -->
+        <div class="jumbotron">
+            <!-- Main heading -->
+            <h1 class="display-4">Point of Sales</h1>
+            <!-- Subtitle describing the system -->
+            <p class="lead">Manage your products, process sales, and track inventory efficiently.</p>
+            <!-- Conditional content based on user authentication status -->
+            {% if user.is_authenticated %}
+                <!-- Horizontal rule for visual separation -->
+                <hr class="my-4">
+                <!-- Prompt for authenticated users -->
+                <p>Ready to get started?</p>
+                <!-- Button to view products - links to product_list view -->
+                <a class="btn btn-primary btn-lg" href="{% url 'pos_app:product_list' %}" role="button">View Products</a>
+                <!-- Button to start new sale - links to sale_process view -->
+                <a class="btn btn-success btn-lg" href="{% url 'pos_app:sale_process' %}" role="button">Start New Sale</a>
+            {% else %}
+                <!-- Horizontal rule for visual separation -->
+                <hr class="my-4">
+                <!-- Prompt for non-authenticated users -->
+                <p>Please register or login to access the system.</p>
+                <!-- Button to register new user - links to register view -->
+                <a class="btn btn-primary btn-lg" href="{% url 'pos_app:register' %}" role="button">Register</a>
+                <!-- Button to login existing user - links to Django's built-in login view -->
+                <a class="btn btn-secondary btn-lg" href="{% url 'login' %}" role="button">Login</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

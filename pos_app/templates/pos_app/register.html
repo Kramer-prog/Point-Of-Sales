@@ -1,0 +1,45 @@
+<!-- Extend the base template to inherit common layout and navigation -->
+{% extends 'pos_app/base.html' %}
+
+<!-- Set the page title for the browser tab -->
+{% block title %}Register - POS System{% endblock %}
+
+<!-- Main content block that will be inserted into the base template -->
+{% block content %}
+<!-- Use Bootstrap grid system with justify-content-center to center the form -->
+<div class="row justify-content-center">
+    <!-- Medium column (6/12 width) for the registration form -->
+    <div class="col-md-6">
+        <!-- Main heading for the page -->
+        <h2>Register</h2>
+        <!-- Form that submits to the register view with POST method -->
+        <form method="post">
+            <!-- Django CSRF protection token -->
+            {% csrf_token %}
+            <!-- Loop through all fields in the UserCreationForm -->
+            {% for field in form %}
+                <!-- Bootstrap form group for each field -->
+                <div class="mb-3">
+                    <!-- Label for the form field -->
+                    <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                    <!-- Render the form field widget -->
+                    {{ field }}
+                    <!-- Display field errors if any exist -->
+                    {% if field.errors %}
+                        <div class="text-danger">
+                            <!-- Loop through and display each error message -->
+                            {% for error in field.errors %}
+                                <small>{{ error }}</small>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+            <!-- Submit button to register the user -->
+            <button type="submit" class="btn btn-primary">Register</button>
+        </form>
+        <!-- Link to login page for existing users -->
+        <p class="mt-3">Already have an account? <a href="{% url 'login' %}">Login here</a>.</p>
+    </div>
+</div>
+{% endblock %}

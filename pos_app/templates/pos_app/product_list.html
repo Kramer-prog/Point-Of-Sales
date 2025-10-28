@@ -1,0 +1,64 @@
+<!-- Extend the base template to inherit common layout and navigation -->
+{% extends 'pos_app/base.html' %}
+
+<!-- Set the page title for the browser tab -->
+{% block title %}Products - POS System{% endblock %}
+
+<!-- Main content block that will be inserted into the base template -->
+{% block content %}
+<!-- Use Bootstrap grid system for layout -->
+<div class="row">
+    <!-- Full width column for product list -->
+    <div class="col-md-12">
+        <!-- Main heading for the page -->
+        <h2>Product List</h2>
+        <!-- Link to Django admin to add new products - requires admin permissions -->
+        <a href="{% url 'admin:pos_app_product_add' %}" class="btn btn-primary mb-3">Add New Product</a>
+        <!-- Make table responsive for mobile devices -->
+        <div class="table-responsive">
+            <!-- Bootstrap table with striped rows for better readability -->
+            <table class="table table-striped">
+                <!-- Table header with column names -->
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Category</th>
+                        <th>Price</th>
+                        <th>Stock</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <!-- Table body with product data -->
+                <tbody>
+                    <!-- Loop through all products passed from the view -->
+                    {% for product in products %}
+                        <tr>
+                            <!-- Display product name -->
+                            <td>{{ product.name }}</td>
+                            <!-- Display category name from related Category model -->
+                            <td>{{ product.category.name }}</td>
+                            <!-- Display product price -->
+                            <td>${{ product.price }}</td>
+                            <!-- Display current stock quantity -->
+                            <td>{{ product.stock_quantity }}</td>
+                            <!-- Actions column with view and edit links -->
+                            <td>
+                                <!-- Link to product detail page in the POS app -->
+                                <a href="{% url 'pos_app:product_detail' product.pk %}" class="btn btn-sm btn-info">View</a>
+                                <!-- Link to Django admin edit page - requires admin permissions -->
+                                <a href="{% url 'admin:pos_app_product_change' product.pk %}" class="btn btn-sm btn-warning">Edit</a>
+                            </td>
+                        </tr>
+                    <!-- Empty clause for when there are no products -->
+                    {% empty %}
+                        <tr>
+                            <!-- Display message when no products exist, spanning all 5 columns -->
+                            <td colspan="5" class="text-center">No products available.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

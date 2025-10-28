@@ -1,0 +1,46 @@
+<!-- Extend the base template to inherit common layout and navigation -->
+{% extends 'pos_app/base.html' %}
+
+<!-- Set the page title for the browser tab -->
+{% block title %}Login{% endblock %}
+
+<!-- Main content block that will be inserted into the base template -->
+{% block content %}
+<!-- Use Bootstrap grid system with justify-content-center to center the login card -->
+<div class="row justify-content-center">
+    <!-- Medium column (6/12 width) for the login form -->
+    <div class="col-md-6">
+        <!-- Bootstrap card component for the login form -->
+        <div class="card">
+            <!-- Card header with title -->
+            <div class="card-header">
+                <h3 class="card-title">Login</h3>
+            </div>
+            <!-- Card body containing the form -->
+            <div class="card-body">
+                <!-- Form that submits to Django's built-in login view with POST method -->
+                <form method="post">
+                    <!-- Django CSRF protection token -->
+                    {% csrf_token %}
+                    <!-- Username input field -->
+                    <div class="mb-3">
+                        <label for="id_username" class="form-label">Username</label>
+                        <!-- Text input for username with Bootstrap styling and required attribute -->
+                        <input type="text" name="username" id="id_username" class="form-control" required>
+                    </div>
+                    <!-- Password input field -->
+                    <div class="mb-3">
+                        <label for="id_password" class="form-label">Password</label>
+                        <!-- Password input with Bootstrap styling and required attribute -->
+                        <input type="password" name="password" id="id_password" class="form-control" required>
+                    </div>
+                    <!-- Submit button to login the user -->
+                    <button type="submit" class="btn btn-primary">Login</button>
+                </form>
+                <!-- Link to registration page for new users -->
+                <p class="mt-3">Don't have an account? <a href="{% url 'pos_app:register' %}">Register here</a></p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

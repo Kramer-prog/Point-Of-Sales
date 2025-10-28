@@ -1,0 +1,80 @@
+<!-- Extend the base template to inherit common layout and navigation -->
+{% extends 'pos_app/base.html' %}
+
+<!-- Set the page title for the browser tab -->
+{% block title %}New Sale - POS System{% endblock %}
+
+<!-- Main content block that will be inserted into the base template -->
+{% block content %}
+<!-- Use Bootstrap grid system for responsive layout -->
+<div class="row">
+    <!-- Left column (8/12 width) - displays available products -->
+    <div class="col-md-8">
+        <h2>Available Products</h2>
+        <!-- Grid layout for product cards -->
+        <div class="row">
+            <!-- Loop through all products passed from the view -->
+            {% for product in products %}
+                <!-- Each product takes 4/12 width (3 per row on medium+ screens) -->
+                <div class="col-md-4 mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <!-- Display product name as card title -->
+                            <h5 class="card-title">{{ product.name }}</h5>
+                            <!-- Display product price -->
+                            <p class="card-text">${{ product.price }}</p>
+                            <!-- Display current stock quantity -->
+                            <p class="card-text">Stock: {{ product.stock_quantity }}</p>
+                            <!-- Link to add product to cart - calls add_to_cart view -->
+                            <a href="{% url 'pos_app:add_to_cart' product.pk %}" class="btn btn-primary">Add to Cart</a>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+    <!-- Right column (4/12 width) - displays shopping cart -->
+    <div class="col-md-4">
+        <h2>Cart</h2>
+        <!-- Check if cart has items -->
+        {% if cart_items %}
+            <!-- Display cart items as a list group -->
+            <div class="list-group mb-3">
+                <!-- Loop through cart items passed from view -->
+                {% for item in cart_items %}
+                    <!-- Each cart item as a list group item -->
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <!-- Display product name and quantity -->
+                        {{ item.product.name }} x{{ item.quantity }}
+                        <!-- Display subtotal for this item -->
+                        <span class="badge bg-primary rounded-pill">${{ item.subtotal }}</span>
+                        <!-- Link to remove item from cart - calls remove_from_cart view -->
+                        <a href="{% url 'pos_app:remove_from_cart' item.product.pk %}" class="btn btn-sm btn-danger">Remove</a>
+                    </div>
+                {% endfor %}
+            </div>
+            <!-- Display total amount for all cart items -->
+            <h4>Total: ${{ total }}</h4>
+            <!-- Form to complete the sale - submits to same view with POST -->
+            <form method="post">
+                <!-- Django CSRF protection token -->
+                {% csrf_token %}
+                <!-- Payment method selection dropdown -->
+                <div class="mb-3">
+                    <label for="payment_method" class="form-label">Payment Method</label>
+                    <select class="form-select" id="payment_method" name="payment_method">
+                        <option value="cash">Cash</option>
+                        <option value="card">Card</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <!-- Submit button to complete the sale transaction -->
+                <button type="submit" class="btn btn-success">Complete Sale</button>
+            </form>
+        {% else %}
+            <!-- Message displayed when cart is empty -->
+            <p>Cart is empty.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

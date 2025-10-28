@@ -1,0 +1,62 @@
+<!-- Extend the base template to inherit common layout and navigation -->
+{% extends 'pos_app/base.html' %}
+
+<!-- Set the page title for the browser tab -->
+{% block title %}Sales Report - POS System{% endblock %}
+
+<!-- Main content block that will be inserted into the base template -->
+{% block content %}
+<!-- Use Bootstrap grid system for layout -->
+<div class="row">
+    <!-- Full width column for sales report -->
+    <div class="col-md-12">
+        <!-- Main heading for the page -->
+        <h2>Sales Report</h2>
+        <!-- Display total sales amount calculated in the view -->
+        <p><strong>Total Sales:</strong> ${{ total_sales }}</p>
+
+        <!-- Bootstrap table with striped rows for better readability -->
+        <table class="table table-striped">
+            <!-- Table header with column names -->
+            <thead>
+                <tr>
+                    <th>Sale ID</th>
+                    <th>User</th>
+                    <th>Total Amount</th>
+                    <th>Payment Method</th>
+                    <th>Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <!-- Table body with sales data -->
+            <tbody>
+                <!-- Loop through all sales passed from the view (ordered by created_at descending) -->
+                {% for sale in sales %}
+                    <tr>
+                        <!-- Display sale ID -->
+                        <td>{{ sale.id }}</td>
+                        <!-- Display username of the user who processed the sale -->
+                        <td>{{ sale.user.username }}</td>
+                        <!-- Display total amount of the sale -->
+                        <td>${{ sale.total_amount }}</td>
+                        <!-- Use Django's get_FOO_display method to show human-readable payment method -->
+                        <td>{{ sale.get_payment_method_display }}</td>
+                        <!-- Display sale creation date -->
+                        <td>{{ sale.created_at }}</td>
+                        <!-- Actions column with link to view sale details -->
+                        <td>
+                            <a href="{% url 'pos_app:sale_detail' sale.pk %}" class="btn btn-sm btn-info">View Details</a>
+                        </td>
+                    </tr>
+                <!-- Empty clause for when there are no sales -->
+                {% empty %}
+                    <tr>
+                        <!-- Display message when no sales exist, spanning all 6 columns -->
+                        <td colspan="6" class="text-center">No sales recorded.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
