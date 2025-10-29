@@ -16,9 +16,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from pos_app.admin import admin_site
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('pos-admin/', admin_site.urls),  # Custom professional admin interface
     path('accounts/', include('django.contrib.auth.urls')),
     path('', include('pos_app.urls')),
 ]
