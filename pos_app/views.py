@@ -11,8 +11,19 @@ from django.contrib.auth import login
 
 # View for the home page - accessible to all users
 def home(request):
-    # Render the home template
-    return render(request, 'pos_app/home.html')
+    # Get statistics for the dashboard
+    products = Product.objects.all()
+    categories = Category.objects.all()
+    sales = Sale.objects.all()
+    total_sales = sum(sale.total_amount for sale in sales)
+
+    # Render the home template with statistics
+    return render(request, 'pos_app/home.html', {
+        'products': products,
+        'categories': categories,
+        'sales': sales,
+        'total_sales': total_sales
+    })
 
 # View for displaying list of products - requires user login
 @login_required
@@ -106,8 +117,8 @@ def sale_process(request):
 
     # Filter products based on category and search
     products = Product.objects.all()
-    if category_id:
-        products = products.filter(category_id=category_id)
+    if category_id and category_id != 'None' and category_id.isdigit():
+        products = products.filter(category_id=int(category_id))
     if search_query:
         products = products.filter(
             models.Q(name__icontains=search_query) | models.Q(barcode__icontains=search_query)
@@ -144,37 +155,105 @@ def sale_process(request):
 # View for adding products to cart - requires user login
 @login_required
 def add_to_cart(request, product_id):
-    # Get product or return 404
-    product = get_object_or_404(Product, pk=product_id)
-    # Get cart from session
-    cart = request.session.get('cart', {})
-    # Increment product quantity in cart
-    cart[str(product_id)] = cart.get(str(product_id), 0) + 1
-    # Save cart back to session
-    request.session['cart'] = cart
-    # Show success message
-    messages.success(request, f'{product.name} added to cart')
-    # Redirect back to sale process page with current filters
-    category = request.GET.get('category', '')
-    search = request.GET.get('search', '')
-    return redirect(reverse('pos_app:sale_process') + f'?category={category}&search={search}' if category or search else reverse('pos_app:sale_process'))
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        # Get product or return 404
+        product = get_object_or_404(Product, pk=product_id)
+        # Get cart from session
+        cart = request.session.get('cart', {})
+        # Increment product quantity in cart
+        cart[str(product_id)] = cart.get(str(product_id), 0) + 1
+        # Save cart back to session
+        request.session['cart'] = cart
+        # Return JSON response for AJAX
+        return JsonResponse({
+            'success': True,
+            'message': f'{product.name} added to cart',
+            'cart_count': len(cart)
+        })
+    else:
+        # Fallback for non-AJAX requests
+        # Get product or return 404
+        product = get_object_or_404(Product, pk=product_id)
+        # Get cart from session
+        cart = request.session.get('cart', {})
+        # Increment product quantity in cart
+        cart[str(product_id)] = cart.get(str(product_id), 0) + 1
+        # Save cart back to session
+        request.session['cart'] = cart
+        # Redirect back to sale process page with current filters and item_added parameter for toast
+        category = request.GET.get('category', '')
+        search = request.GET.get('search', '')
+        base_url = reverse('pos_app:sale_process')
+        params = []
+        if category:
+            params.append(f'category={category}')
+        if search:
+            params.append(f'search={search}')
+        params.append(f'item_added={product.name}')
+        query_string = '?' + '&'.join(params) if params else ''
+        return redirect(base_url + query_string)
 
 # View for removing products from cart - requires user login
 @login_required
 def remove_from_cart(request, product_id):
-    # Get cart from session
-    cart = request.session.get('cart', {})
-    # Remove product from cart if it exists
-    if str(product_id) in cart:
-        del cart[str(product_id)]
-        # Save updated cart to session
-        request.session['cart'] = cart
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        # Get cart from session
+        cart = request.session.get('cart', {})
+        # Remove product from cart if it exists
+        if str(product_id) in cart:
+            del cart[str(product_id)]
+            # Save updated cart to session
+            request.session['cart'] = cart
+            # Return JSON response for AJAX
+            return JsonResponse({
+                'success': True,
+                'message': 'Item removed from cart',
+                'cart_count': len(cart)
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': 'Item not found in cart'
+            })
+    else:
+        # Fallback for non-AJAX requests
+        # Get cart from session
+        cart = request.session.get('cart', {})
+        # Remove product from cart if it exists
+        if str(product_id) in cart:
+            del cart[str(product_id)]
+            # Save updated cart to session
+            request.session['cart'] = cart
+            # Show success message
+            messages.success(request, 'Item removed from cart')
+        # Redirect back to sale process page with current filters
+        category = request.GET.get('category', '')
+        search = request.GET.get('search', '')
+        return redirect(reverse('pos_app:sale_process') + f'?category={category}&search={search}' if category or search else reverse('pos_app:sale_process'))
+
+# View for clearing the entire cart - requires user login
+@login_required
+def clear_cart(request):
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        # Clear cart from session
+        request.session['cart'] = {}
+        # Return JSON response for AJAX
+        return JsonResponse({
+            'success': True,
+            'message': 'Cart cleared successfully',
+            'cart_count': 0
+        })
+    else:
+        # Fallback for non-AJAX requests
+        # Clear cart from session
+        request.session['cart'] = {}
         # Show success message
-        messages.success(request, 'Item removed from cart')
-    # Redirect back to sale process page with current filters
-    category = request.GET.get('category', '')
-    search = request.GET.get('search', '')
-    return redirect(reverse('pos_app:sale_process') + f'?category={category}&search={search}' if category or search else reverse('pos_app:sale_process'))
+        messages.success(request, 'Cart cleared successfully')
+        # Redirect back to sale process page
+        return redirect('pos_app:sale_process')
 
 # View for sale confirmation - requires user login
 @login_required
@@ -274,10 +353,13 @@ def sales_report(request):
     sales = Sale.objects.all().order_by('-created_at')
     # Calculate total sales amount
     total_sales = sum(sale.total_amount for sale in sales)
+    # Calculate average sale amount
+    average_sale = total_sales / len(sales) if sales else 0
     # Render sales report template with data
     return render(request, 'pos_app/sales_report.html', {
         'sales': sales,
-        'total_sales': total_sales
+        'total_sales': total_sales,
+        'average_sale': average_sale
     })
 
 # View for user registration - accessible to all users

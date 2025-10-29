@@ -1,58 +1,147 @@
 <!-- Extend the base template to inherit common layout and navigation -->
 {% extends 'pos_app/base.html' %}
 
-<!-- Set the page title with sale ID for the browser tab -->
-{% block title %}Sale #{{ sale.id }} - POS System{% endblock %}
+<!-- Set the page title for the browser tab -->
+{% block title %}Sale Detail - POS System{% endblock %}
 
 <!-- Main content block that will be inserted into the base template -->
 {% block content %}
-<!-- Use Bootstrap grid system for layout -->
-<div class="row">
-    <!-- Full width column for sale details -->
-    <div class="col-md-12">
-        <!-- Main heading with sale ID -->
-        <h2>Sale #{{ sale.id }}</h2>
+<!-- Page header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-0"><i class="fas fa-receipt text-primary me-2"></i>Sale Details</h2>
+        <small class="text-muted">Transaction information and item breakdown</small>
+    </div>
+    <div class="text-end">
+        <small class="text-muted d-block">Sale ID</small>
+        <strong>#{{ sale.id }}</strong>
+    </div>
+</div>
 
-        <!-- Display sale metadata -->
-        <p><strong>Date:</strong> {{ sale.created_at }}</p>
-        <p><strong>User:</strong> {{ sale.user.username }}</p>
-        <!-- Use Django's get_FOO_display method to show human-readable payment method -->
-        <p><strong>Payment Method:</strong> {{ sale.get_payment_method_display }}</p>
-        <p><strong>Total Amount:</strong> ₱{{ sale.total_amount }}</p>
+<!-- Sale summary cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <i class="fas fa-user fa-2x text-info mb-2"></i>
+                <h6 class="card-title mb-1">{{ sale.user.username }}</h6>
+                <small class="text-muted">Cashier</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <i class="fas fa-peso-sign fa-2x text-success mb-2"></i>
+                <h4 class="card-title mb-1">₱{{ sale.total_amount|floatformat:2 }}</h4>
+                <small class="text-muted">Total Amount</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <i class="fas fa-credit-card fa-2x text-primary mb-2"></i>
+                <h6 class="card-title mb-1">{{ sale.get_payment_method_display }}</h6>
+                <small class="text-muted">Payment Method</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <i class="fas fa-calendar fa-2x text-warning mb-2"></i>
+                <h6 class="card-title mb-1">{{ sale.created_at|date:"M j, Y" }}</h6>
+                <small class="text-muted">{{ sale.created_at|time:"g:i A" }}</small>
+            </div>
+        </div>
+    </div>
+</div>
 
-        <!-- Section heading for sale items -->
-        <h3>Items</h3>
-        <!-- Bootstrap table with striped rows for better readability -->
-        <table class="table table-striped">
-            <!-- Table header with column names -->
-            <thead>
-                <tr>
-                    <th>Product</th>
-                    <th>Quantity</th>
-                    <th>Unit Price</th>
-                    <th>Total Price</th>
-                </tr>
-            </thead>
-            <!-- Table body with sale items data -->
-            <tbody>
-                <!-- Loop through all items related to this sale using the 'items' related manager -->
-                {% for item in sale.items.all %}
+<!-- Items sold table -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-shopping-bag me-2"></i>Items Sold</h5>
+        <span class="badge bg-primary">{{ sale.items.all|length }} items</span>
+    </div>
+    <div class="card-body">
+        <!-- Make table responsive for mobile devices -->
+        <div class="table-responsive">
+            <!-- Bootstrap table with hover effect for better UX -->
+            <table class="table table-hover">
+                <!-- Table header with column names -->
+                <thead class="table-light">
                     <tr>
-                        <!-- Display product name from the related Product model -->
-                        <td>{{ item.product.name }}</td>
-                        <!-- Display quantity purchased -->
-                        <td>{{ item.quantity }}</td>
-                        <!-- Display unit price at time of sale -->
-                        <td>₱{{ item.unit_price }}</td>
-                        <!-- Display total price for this line item -->
-                        <td>₱{{ item.total_price }}</td>
+                        <th><i class="fas fa-box me-1"></i>Product</th>
+                        <th><i class="fas fa-tags me-1"></i>Category</th>
+                        <th><i class="fas fa-hashtag me-1"></i>Quantity</th>
+                        <th><i class="fas fa-peso-sign me-1"></i>Unit Price</th>
+                        <th><i class="fas fa-calculator me-1"></i>Total Price</th>
                     </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                </thead>
+                <!-- Table body with sale items data -->
+                <tbody>
+                    <!-- Loop through sale items related to this sale -->
+                    {% for item in sale.items.all %}
+                        <tr>
+                            <!-- Display product name with icon -->
+                            <td>
+                                <strong>{{ item.product.name }}</strong>
+                                {% if item.product.barcode %}
+                                <br><small class="text-muted">Barcode: {{ item.product.barcode }}</small>
+                                {% endif %}
+                            </td>
+                            <!-- Display category name -->
+                            <td>
+                                <span class="badge bg-secondary">{{ item.product.category.name }}</span>
+                            </td>
+                            <!-- Display quantity sold -->
+                            <td>
+                                <span class="badge bg-info">{{ item.quantity }}</span>
+                            </td>
+                            <!-- Display unit price at time of sale -->
+                            <td>
+                                <strong class="text-success">₱{{ item.unit_price|floatformat:2 }}</strong>
+                            </td>
+                            <!-- Display total price for this item -->
+                            <td>
+                                <strong class="text-primary">₱{{ item.total_price|floatformat:2 }}</strong>
+                            </td>
+                        </tr>
+                    <!-- Empty clause for when there are no items (shouldn't happen) -->
+                    {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4">
+                                <i class="fas fa-exclamation-triangle text-warning fa-2x mb-2"></i>
+                                <div>No items found for this sale.</div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                <!-- Table footer with totals -->
+                <tfoot class="table-light">
+                    <tr>
+                        <th colspan="4" class="text-end">Total Amount:</th>
+                        <th class="text-primary fs-5">₱{{ sale.total_amount|floatformat:2 }}</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
 
-        <!-- Navigation link back to sales reports page -->
-        <a href="{% url 'pos_app:sales_report' %}" class="btn btn-secondary">Back to Reports</a>
+<!-- Action buttons -->
+<div class="d-flex justify-content-between mt-4">
+    <a href="{% url 'pos_app:sales_report' %}" class="btn btn-outline-primary">
+        <i class="fas fa-arrow-left me-2"></i>Back to Sales Report
+    </a>
+    <div>
+        <button onclick="window.print()" class="btn btn-outline-secondary me-2">
+            <i class="fas fa-print me-1"></i>Print Receipt
+        </button>
+        <a href="{% url 'pos_app:sale_process' %}" class="btn btn-success">
+            <i class="fas fa-plus me-2"></i>New Sale
+        </a>
     </div>
 </div>
 {% endblock %}

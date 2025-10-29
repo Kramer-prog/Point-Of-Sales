@@ -6,26 +6,75 @@
 
 <!-- Main content block that will be inserted into the base template -->
 {% block content %}
-<!-- Use Bootstrap grid system for layout -->
-<div class="row">
-    <!-- Full width column for product list -->
-    <div class="col-md-12">
-        <!-- Main heading for the page -->
-        <h2>Product List</h2>
-        <!-- Link to Django admin to add new products - requires admin permissions -->
-        <a href="{% url 'admin:pos_app_product_add' %}" class="btn btn-primary mb-3">Add New Product</a>
+<!-- Page header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-0"><i class="fas fa-boxes text-primary me-2"></i>Product Inventory</h2>
+        <small class="text-muted">Manage your product catalog and inventory levels</small>
+    </div>
+    <a href="{% url 'admin:pos_app_product_add' %}" class="btn btn-success">
+        <i class="fas fa-plus me-2"></i>Add New Product
+    </a>
+</div>
+
+<!-- Statistics cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <i class="fas fa-box fa-2x text-primary mb-2"></i>
+                <h4 class="card-title mb-1">{{ products|length }}</h4>
+                <small class="text-muted">Total Products</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <i class="fas fa-tags fa-2x text-info mb-2"></i>
+                <h4 class="card-title mb-1">{{ products|length|add:0 }}</h4>
+                <small class="text-muted">Categories</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                <h4 class="card-title mb-1">{{ products|length|add:0 }}</h4>
+                <small class="text-muted">In Stock</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <i class="fas fa-exclamation-triangle fa-2x text-warning mb-2"></i>
+                <h4 class="card-title mb-1">0</h4>
+                <small class="text-muted">Low Stock</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Product table -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-list me-2"></i>Product List</h5>
+    </div>
+    <div class="card-body">
         <!-- Make table responsive for mobile devices -->
         <div class="table-responsive">
-            <!-- Bootstrap table with striped rows for better readability -->
-            <table class="table table-striped">
+            <!-- Bootstrap table with hover effect for better UX -->
+            <table class="table table-hover">
                 <!-- Table header with column names -->
-                <thead>
+                <thead class="table-light">
                     <tr>
-                        <th>Name</th>
-                        <th>Category</th>
-                        <th>Price</th>
-                        <th>Stock</th>
-                        <th>Actions</th>
+                        <th><i class="fas fa-tag me-1"></i>Name</th>
+                        <th><i class="fas fa-folder me-1"></i>Category</th>
+                        <th><i class="fas fa-peso-sign me-1"></i>Price</th>
+                        <th><i class="fas fa-warehouse me-1"></i>Stock</th>
+                        <th><i class="fas fa-cogs me-1"></i>Actions</th>
                     </tr>
                 </thead>
                 <!-- Table body with product data -->
@@ -33,27 +82,56 @@
                     <!-- Loop through all products passed from the view -->
                     {% for product in products %}
                         <tr>
-                            <!-- Display product name -->
-                            <td>{{ product.name }}</td>
+                            <!-- Display product name with icon -->
+                            <td>
+                                <strong>{{ product.name }}</strong>
+                                {% if product.barcode %}
+                                <br><small class="text-muted">Barcode: {{ product.barcode }}</small>
+                                {% endif %}
+                            </td>
                             <!-- Display category name from related Category model -->
-                            <td>{{ product.category.name }}</td>
+                            <td>
+                                <span class="badge bg-secondary">{{ product.category.name }}</span>
+                            </td>
                             <!-- Display product price -->
-                            <td>₱{{ product.price }}</td>
-                            <!-- Display current stock quantity -->
-                            <td>{{ product.stock_quantity }}</td>
+                            <td>
+                                <strong class="text-success">₱{{ product.price }}</strong>
+                            </td>
+                            <!-- Display current stock quantity with color coding -->
+                            <td>
+                                {% if product.stock_quantity > 10 %}
+                                    <span class="badge bg-success">{{ product.stock_quantity }}</span>
+                                {% elif product.stock_quantity > 0 %}
+                                    <span class="badge bg-warning">{{ product.stock_quantity }}</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Out of Stock</span>
+                                {% endif %}
+                            </td>
                             <!-- Actions column with view and edit links -->
                             <td>
-                                <!-- Link to product detail page in the POS app -->
-                                <a href="{% url 'pos_app:product_detail' product.pk %}" class="btn btn-sm btn-info">View</a>
-                                <!-- Link to Django admin edit page - requires admin permissions -->
-                                <a href="{% url 'admin:pos_app_product_change' product.pk %}" class="btn btn-sm btn-warning">Edit</a>
+                                <div class="btn-group" role="group">
+                                    <!-- Link to product detail page in the POS app -->
+                                    <a href="{% url 'pos_app:product_detail' product.pk %}" class="btn btn-sm btn-outline-info" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <!-- Link to Django admin edit page - requires admin permissions -->
+                                    <a href="{% url 'admin:pos_app_product_change' product.pk %}" class="btn btn-sm btn-outline-warning" title="Edit Product">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                </div>
                             </td>
                         </tr>
                     <!-- Empty clause for when there are no products -->
                     {% empty %}
                         <tr>
-                            <!-- Display message when no products exist, spanning all 5 columns -->
-                            <td colspan="5" class="text-center">No products available.</td>
+                            <td colspan="5" class="text-center py-5">
+                                <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                <h5 class="text-muted">No products available</h5>
+                                <p class="text-muted">Start by adding your first product to the inventory.</p>
+                                <a href="{% url 'admin:pos_app_product_add' %}" class="btn btn-primary">
+                                    <i class="fas fa-plus me-2"></i>Add First Product
+                                </a>
+                            </td>
                         </tr>
                     {% endfor %}
                 </tbody>

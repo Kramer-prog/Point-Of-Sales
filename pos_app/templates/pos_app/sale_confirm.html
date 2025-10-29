@@ -6,75 +6,163 @@
 
 <!-- Main content block that will be inserted into the base template -->
 {% block content %}
-<div class="container mt-4">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h3 class="card-title mb-0">Order Summary & Confirmation</h3>
+<!-- Page header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-0"><i class="fas fa-check-circle text-success me-2"></i>Confirm Sale</h2>
+        <small class="text-muted">Review order details and complete the transaction</small>
+    </div>
+    <div class="text-end">
+        <small class="text-muted d-block">Order Summary</small>
+        <strong>{{ cart_items|length }} items • ₱{{ total }}</strong>
+    </div>
+</div>
+
+<!-- Main confirmation interface -->
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        {% if cart_items %}
+            <!-- Order summary card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-receipt me-2"></i>Order Summary</h5>
                 </div>
                 <div class="card-body">
-                    <h4 class="mb-3">Items in Cart:</h4>
-
-                    <!-- Display cart items -->
-                    <div class="table-responsive">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Product</th>
-                                    <th>Quantity</th>
-                                    <th>Unit Price</th>
-                                    <th>Subtotal</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in cart_items %}
-                                <tr>
-                                    <td>{{ item.product.name }}</td>
-                                    <td>{{ item.quantity }}</td>
-                                    <td>₱{{ item.product.price }}</td>
-                                    <td>₱{{ item.subtotal }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    <!-- Order items -->
+                    <div class="order-items mb-4">
+                        {% for item in cart_items %}
+                            <div class="order-item d-flex justify-content-between align-items-center p-3 border-bottom">
+                                <div class="d-flex align-items-center">
+                                    <div class="item-icon me-3">
+                                        <i class="fas fa-box fa-2x text-primary"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-1">{{ item.product.name }}</h6>
+                                        <small class="text-muted">
+                                            {{ item.product.category.name }} • ₱{{ item.product.price }} each
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="quantity-badge mb-2">
+                                        <span class="badge bg-primary fs-6">Qty: {{ item.quantity }}</span>
+                                    </div>
+                                    <div class="item-total">
+                                        <strong class="text-success fs-5">₱{{ item.subtotal }}</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
                     </div>
 
-                    <!-- Display total -->
-                    <div class="row mt-3">
-                        <div class="col-md-6 offset-md-6">
-                            <div class="card bg-light">
-                                <div class="card-body text-center">
-                                    <h4 class="mb-0">Total: ₱{{ total }}</h4>
+                    <!-- Order totals -->
+                    <div class="order-totals bg-light p-3 rounded">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Subtotal ({{ cart_items|length }} items):</span>
+                                    <strong>₱{{ total }}</strong>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Tax:</span>
+                                    <strong>₱0.00</strong>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Discount:</span>
+                                    <strong>₱0.00</strong>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="total-section bg-white p-3 rounded border">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="fs-4">Total:</span>
+                                        <strong class="fs-4 text-success">₱{{ total }}</strong>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    <!-- Confirmation form -->
-                    <form method="post" class="mt-4">
-                        <!-- Django CSRF protection token -->
+            <!-- Payment and completion card -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-credit-card me-2"></i>Payment & Completion</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
                         {% csrf_token %}
 
                         <!-- Payment method selection -->
-                        <div class="mb-3">
-                            <label for="payment_method" class="form-label"><strong>Payment Method:</strong></label>
-                            <select class="form-select" id="payment_method" name="payment_method" required>
-                                <option value="cash">Cash</option>
-                                <option value="card">Card</option>
-                                <option value="other">Other</option>
+                        <div class="mb-4">
+                            <label for="payment_method" class="form-label fw-bold">
+                                <i class="fas fa-money-bill-wave me-1"></i>Payment Method
+                            </label>
+                            <select class="form-select form-select-lg" id="payment_method" name="payment_method" required>
+                                <option value="">Select payment method</option>
+                                <option value="cash">
+                                    <i class="fas fa-money-bill-wave me-2"></i>Cash
+                                </option>
+                                <option value="card">
+                                    <i class="fas fa-credit-card me-2"></i>Credit/Debit Card
+                                </option>
                             </select>
                         </div>
 
                         <!-- Action buttons -->
-                        <div class="d-flex justify-content-between">
-                            <a href="{% url 'pos_app:sale_process' %}" class="btn btn-secondary">Back to Cart</a>
-                            <button type="submit" class="btn btn-success btn-lg">Confirm & Complete Sale</button>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <a href="{% url 'pos_app:sale_process' %}" class="btn btn-outline-secondary btn-lg w-100">
+                                    <i class="fas fa-arrow-left me-2"></i>Back to Cart
+                                </a>
+                            </div>
+                            <div class="col-md-6">
+                                <button type="submit" class="btn btn-success btn-lg w-100">
+                                    <i class="fas fa-check-circle me-2"></i>Complete Sale
+                                </button>
+                            </div>
                         </div>
                     </form>
                 </div>
             </div>
-        </div>
+        {% else %}
+            <!-- Empty cart state -->
+            <div class="card text-center">
+                <div class="card-body py-5">
+                    <i class="fas fa-shopping-cart fa-4x text-muted mb-4"></i>
+                    <h4 class="text-muted mb-3">No Items to Confirm</h4>
+                    <p class="text-muted mb-4">Your cart appears to be empty. Please add some products before proceeding.</p>
+                    <a href="{% url 'pos_app:sale_process' %}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Sale
+                    </a>
+                </div>
+            </div>
+        {% endif %}
     </div>
 </div>
+
+<style>
+.order-item {
+    transition: background-color 0.2s ease;
+}
+
+.order-item:hover {
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+.total-section {
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 768px) {
+    .order-totals .row > div {
+        margin-bottom: 1rem;
+    }
+
+    .total-section {
+        text-align: center;
+    }
+}
+</style>
 {% endblock %}

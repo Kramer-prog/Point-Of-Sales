@@ -1,0 +1,163 @@
+<!-- Extend the base template to inherit common layout and navigation -->
+{% extends 'pos_app/base.html' %}
+
+<!-- Set the page title for the browser tab -->
+{% block title %}{{ product.name }} - POS System{% endblock %}
+
+<!-- Main content block that will be inserted into the base template -->
+{% block content %}
+<!-- Use Bootstrap grid system for responsive layout -->
+<div class="container-fluid">
+    <!-- Breadcrumb navigation -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'pos_app:home' %}">Home</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'pos_app:product_list' %}">Products</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ product.name }}</li>
+        </ol>
+    </nav>
+
+    <!-- Product detail card -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-box me-2"></i>{{ product.name }}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <!-- Product basic information -->
+                            <h5 class="text-primary mb-3">Product Information</h5>
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td class="fw-bold">Name:</td>
+                                    <td>{{ product.name }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">Category:</td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ product.category.name }}</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">Price:</td>
+                                    <td class="text-success fw-bold fs-5">₱{{ product.price }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">Cost Price:</td>
+                                    <td>₱{{ product.cost_price }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">Stock Quantity:</td>
+                                    <td>
+                                        {% if product.stock_quantity == 0 %}
+                                            <span class="badge bg-danger">Out of Stock</span>
+                                        {% elif product.stock_quantity < 10 %}
+                                            <span class="badge bg-warning text-dark">Low Stock ({{ product.stock_quantity }})</span>
+                                        {% else %}
+                                            <span class="badge bg-success">{{ product.stock_quantity }} in stock</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% if product.barcode %}
+                                <tr>
+                                    <td class="fw-bold">Barcode:</td>
+                                    <td><code>{{ product.barcode }}</code></td>
+                                </tr>
+                                {% endif %}
+                                <tr>
+                                    <td class="fw-bold">Created:</td>
+                                    <td>{{ product.created_at|date:"M j, Y g:i A" }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">Last Updated:</td>
+                                    <td>{{ product.updated_at|date:"M j, Y g:i A" }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <!-- Product description -->
+                            <h5 class="text-primary mb-3">Description</h5>
+                            {% if product.description %}
+                                <p class="text-muted">{{ product.description }}</p>
+                            {% else %}
+                                <p class="text-muted fst-italic">No description available.</p>
+                            {% endif %}
+
+                            <!-- Action buttons -->
+                            <div class="mt-4">
+                                <a href="{% url 'pos_app:add_to_cart' product.pk %}" class="btn btn-success btn-lg me-2">
+                                    <i class="fas fa-cart-plus me-2"></i>Add to Cart
+                                </a>
+                                <a href="{% url 'pos_app:product_list' %}" class="btn btn-outline-primary">
+                                    <i class="fas fa-arrow-left me-2"></i>Back to Products
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar with quick stats -->
+        <div class="col-lg-4">
+            <!-- Stock status card -->
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-light">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>Stock Status
+                    </h6>
+                </div>
+                <div class="card-body text-center">
+                    <div class="mb-3">
+                        {% if product.stock_quantity == 0 %}
+                            <i class="fas fa-times-circle fa-3x text-danger mb-3"></i>
+                            <h4 class="text-danger">Out of Stock</h4>
+                        {% elif product.stock_quantity < 10 %}
+                            <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+                            <h4 class="text-warning">{{ product.stock_quantity }}</h4>
+                            <p class="text-muted">Low stock warning</p>
+                        {% else %}
+                            <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                            <h4 class="text-success">{{ product.stock_quantity }}</h4>
+                            <p class="text-muted">Units available</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profit margin card -->
+            {% if product.cost_price and product.price %}
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light">
+                        <h6 class="card-title mb-0">
+                            <i class="fas fa-money-bill-wave me-2"></i>Profit Analysis
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <small class="text-muted">Profit per unit</small>
+                                <h5 class="text-success">₱{{ product.price|floatformat:2 }}</h5>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted">Margin</small>
+                                <h5 class="text-info">
+                                    {% if product.price > 0 %}
+                                        {% widthratio product.cost_price product.price 100 %}%
+                                    {% else %}
+                                        N/A
+                                    {% endif %}
+                                </h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

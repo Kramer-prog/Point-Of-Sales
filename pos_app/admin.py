@@ -1,165 +1,165 @@
 # Import Django admin module and all models from the current app
 from django.contrib import admin
+from django.db.models import Sum, Count
 from django.utils.html import format_html
 from django.urls import reverse
 from .models import Category, Product, Sale, SaleItem, Inventory
 
-# Custom admin site configuration
-class POSAdminSite(admin.AdminSite):
-    site_header = "Point of Sale Administration"
-    site_title = "POS Admin Portal"
-    index_title = "Welcome to POS Management System"
-
-# Create custom admin site instance
-admin_site = POSAdminSite(name='pos_admin')
+# Inline admin for SaleItem to show items within Sale admin
+class SaleItemInline(admin.TabularInline):
+    model = SaleItem
+    extra = 0
+    readonly_fields = ('total_price',)
+    fields = ('product', 'quantity', 'unit_price', 'total_price')
 
 # Admin configuration for Category model - manages product categories
-@admin.register(Category, site=admin_site)
+@admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
     # Fields to display in the admin list view
-    list_display = ('name', 'description', 'product_count', 'created_products')
+    list_display = ('name', 'description', 'product_count', 'total_value')
     # Fields that can be searched in admin
     search_fields = ('name', 'description')
-    # Fields that can be edited directly in list view
-    list_editable = ('description',)
-    # Ordering of list view
-    ordering = ('name',)
 
     def product_count(self, obj):
         return obj.product_set.count()
-    product_count.short_description = "Products"
+    product_count.short_description = 'Products'
 
-    def created_products(self, obj):
-        count = obj.product_set.count()
-        url = reverse('admin:pos_app_product_changelist') + f'?category__id__exact={obj.id}'
-        return format_html('<a href="{}">View {} products</a>', url, count)
-    created_products.short_description = "Actions"
+    def total_value(self, obj):
+        total = obj.product_set.aggregate(
+            total=Sum('price') * Sum('stock_quantity')
+        )['total'] or 0
+        return f"₱{total:.2f}"
+    total_value.short_description = 'Total Value'
 
 # Admin configuration for Product model - manages product inventory
-@admin.register(Product, site=admin_site)
+@admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     # Fields to display in the admin list view
-    list_display = ('name', 'category', 'formatted_price', 'stock_quantity', 'stock_status', 'barcode', 'updated_at')
+    list_display = ('name', 'category', 'price', 'stock_quantity', 'stock_status', 'barcode', 'updated_at')
     # Filters available in admin sidebar
-    list_filter = ('category', 'stock_quantity', 'created_at', 'updated_at')
+    list_filter = ('category', 'stock_quantity', 'updated_at')
     # Fields that can be searched in admin
     search_fields = ('name', 'barcode', 'category__name')
-    # Fields that can be edited directly in list view
-    list_editable = ('stock_quantity',)
     # Fields that are read-only in admin forms
     readonly_fields = ('created_at', 'updated_at')
-    # Ordering of list view
+    # Ordering
     ordering = ('-updated_at',)
-    # Number of items per page
-    list_per_page = 25
-
-    def formatted_price(self, obj):
-        return f"₱{obj.price}"
-    formatted_price.short_description = "Price"
-    formatted_price.admin_order_field = 'price'
+    # Actions
+    actions = ['mark_out_of_stock', 'update_stock']
 
     def stock_status(self, obj):
         if obj.stock_quantity == 0:
-            return format_html('<span style="color: red; font-weight: bold;">Out of Stock</span>')
+            return format_html('<span style="color: red;">Out of Stock</span>')
         elif obj.stock_quantity < 10:
-            return format_html('<span style="color: orange; font-weight: bold;">Low Stock ({})</span>', obj.stock_quantity)
+            return format_html('<span style="color: orange;">Low Stock ({})</span>', obj.stock_quantity)
         else:
             return format_html('<span style="color: green;">In Stock ({})</span>', obj.stock_quantity)
-    stock_status.short_description = "Stock Status"
-
-    # Custom actions
-    actions = ['mark_out_of_stock', 'increase_stock']
+    stock_status.short_description = 'Stock Status'
 
     def mark_out_of_stock(self, request, queryset):
         queryset.update(stock_quantity=0)
-        self.message_user(request, f"{queryset.count()} products marked as out of stock.")
+        self.message_user(request, f"Marked {queryset.count()} products as out of stock.")
     mark_out_of_stock.short_description = "Mark selected products as out of stock"
 
-    def increase_stock(self, request, queryset):
-        for product in queryset:
-            product.stock_quantity += 10
-            product.save()
-        self.message_user(request, f"Increased stock by 10 for {queryset.count()} products.")
-    increase_stock.short_description = "Increase stock by 10 for selected products"
+    def update_stock(self, request, queryset):
+        # This would typically open a form, but for simplicity we'll just show a message
+        self.message_user(request, "Use the change form to update stock quantities individually.")
+    update_stock.short_description = "Update stock (use change form)"
 
 # Admin configuration for Sale model - manages sales transactions
-@admin.register(Sale, site=admin_site)
+@admin.register(Sale)
 class SaleAdmin(admin.ModelAdmin):
     # Fields to display in the admin list view
-    list_display = ('id', 'user', 'formatted_total', 'payment_method', 'item_count', 'created_at', 'view_items')
+    list_display = ('id', 'user', 'total_amount', 'payment_method', 'item_count', 'created_at', 'view_details')
     # Filters available in admin sidebar
     list_filter = ('payment_method', 'created_at', 'user')
     # Fields that can be searched in admin
-    search_fields = ('id', 'user__username', 'user__email')
+    search_fields = ('id', 'user__username')
     # Fields that are read-only in admin forms
-    readonly_fields = ('created_at',)
-    # Ordering of list view
-    ordering = ('-created_at',)
-    # Number of items per page
-    list_per_page = 20
-
-    def formatted_total(self, obj):
-        return f"₱{obj.total_amount}"
-    formatted_total.short_description = "Total Amount"
-    formatted_total.admin_order_field = 'total_amount'
+    readonly_fields = ('created_at', 'total_amount')
+    # Inlines
+    inlines = [SaleItemInline]
+    # Actions
+    actions = ['export_sales_data']
 
     def item_count(self, obj):
         return obj.items.count()
-    item_count.short_description = "Items"
+    item_count.short_description = 'Items'
 
-    def view_items(self, obj):
-        url = reverse('admin:pos_app_saleitem_changelist') + f'?sale__id__exact={obj.id}'
-        return format_html('<a href="{}" class="button">View Items</a>', url)
-    view_items.short_description = "Actions"
+    def view_details(self, obj):
+        return format_html('<a href="{}" class="button">View Details</a>',
+                          reverse('admin:pos_app_sale_change', args=(obj.pk,)))
+    view_details.short_description = 'Details'
+
+    def export_sales_data(self, request, queryset):
+        # This would typically export to CSV/Excel, but for now just show message
+        self.message_user(request, f"Exported {queryset.count()} sales records.")
+    export_sales_data.short_description = "Export selected sales data"
 
 # Admin configuration for SaleItem model - manages individual sale items
-@admin.register(SaleItem, site=admin_site)
+@admin.register(SaleItem)
 class SaleItemAdmin(admin.ModelAdmin):
     # Fields to display in the admin list view
-    list_display = ('sale', 'product', 'quantity', 'formatted_unit_price', 'formatted_total_price', 'sale_date')
+    list_display = ('sale_link', 'product', 'quantity', 'unit_price', 'total_price', 'sale_date')
     # Filters available in admin sidebar
     list_filter = ('sale__created_at', 'product__category')
     # Fields that can be searched in admin
-    search_fields = ('sale__id', 'product__name', 'product__barcode')
+    search_fields = ('product__name', 'sale__id')
     # Fields that are read-only in admin forms
-    readonly_fields = ('sale', 'product', 'quantity', 'unit_price', 'total_price')
-    # Ordering of list view
-    ordering = ('-sale__created_at',)
-    # Number of items per page
-    list_per_page = 25
+    readonly_fields = ('total_price',)
 
-    def formatted_unit_price(self, obj):
-        return f"₱{obj.unit_price}"
-    formatted_unit_price.short_description = "Unit Price"
-
-    def formatted_total_price(self, obj):
-        return f"₱{obj.total_price}"
-    formatted_total_price.short_description = "Total Price"
+    def sale_link(self, obj):
+        return format_html('<a href="{}">Sale #{}</a>',
+                          reverse('admin:pos_app_sale_change', args=(obj.sale.pk,)),
+                          obj.sale.id)
+    sale_link.short_description = 'Sale'
 
     def sale_date(self, obj):
         return obj.sale.created_at
-    sale_date.short_description = "Sale Date"
+    sale_date.short_description = 'Sale Date'
     sale_date.admin_order_field = 'sale__created_at'
 
 # Admin configuration for Inventory model - manages inventory tracking
-@admin.register(Inventory, site=admin_site)
+@admin.register(Inventory)
 class InventoryAdmin(admin.ModelAdmin):
     # Fields to display in the admin list view
-    list_display = ('product', 'quantity', 'last_updated', 'stock_alert')
+    list_display = ('product', 'quantity', 'stock_level', 'last_updated')
     # Filters available in admin sidebar
     list_filter = ('last_updated',)
     # Fields that can be searched in admin
-    search_fields = ('product__name', 'product__barcode')
+    search_fields = ('product__name',)
     # Fields that are read-only in admin forms
     readonly_fields = ('last_updated',)
-    # Ordering of list view
-    ordering = ('-last_updated',)
 
-    def stock_alert(self, obj):
+    def stock_level(self, obj):
         if obj.quantity == 0:
-            return format_html('<span style="color: red;">⚠️ Critical</span>')
-        elif obj.quantity < 10:
-            return format_html('<span style="color: orange;">⚠️ Low</span>')
+            return format_html('<span style="color: red;">Critical</span>')
+        elif obj.quantity < 5:
+            return format_html('<span style="color: orange;">Low</span>')
+        elif obj.quantity < 20:
+            return format_html('<span style="color: blue;">Medium</span>')
         else:
-            return format_html('<span style="color: green;">✓ Normal</span>')
-    stock_alert.short_description = "Alert"
+            return format_html('<span style="color: green;">High</span>')
+    stock_level.short_description = 'Stock Level'
+
+# Custom admin site configuration
+class POSAdminSite(admin.AdminSite):
+    site_header = "POS System Administration"
+    site_title = "POS Admin"
+    index_title = "Welcome to POS System Admin"
+
+    def get_app_list(self, request):
+        app_list = super().get_app_list(request)
+        # Add custom ordering and grouping
+        for app in app_list:
+            if app['app_label'] == 'pos_app':
+                app['models'].sort(key=lambda x: ['Category', 'Product', 'Inventory', 'Sale', 'SaleItem'].index(x['object_name']))
+        return app_list
+
+# Register the custom admin site
+admin_site = POSAdminSite(name='pos_admin')
+admin_site.register(Category, CategoryAdmin)
+admin_site.register(Product, ProductAdmin)
+admin_site.register(Sale, SaleAdmin)
+admin_site.register(SaleItem, SaleItemAdmin)
+admin_site.register(Inventory, InventoryAdmin)

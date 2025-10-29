@@ -6,57 +6,222 @@
 
 <!-- Main content block that will be inserted into the base template -->
 {% block content %}
-<!-- Use Bootstrap grid system for layout -->
-<div class="row">
-    <!-- Full width column for sales report -->
-    <div class="col-md-12">
-        <!-- Main heading for the page -->
-        <h2>Sales Report</h2>
-        <!-- Display total sales amount calculated in the view -->
-        <p><strong>Total Sales:</strong> ₱{{ total_sales }}</p>
+<!-- Page header -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-0"><i class="fas fa-chart-bar text-primary me-2"></i>Sales Analytics</h2>
+        <small class="text-muted">Track your sales performance and revenue</small>
+    </div>
+    <div class="text-end">
+        <small class="text-muted d-block">Report Period</small>
+        <strong>All Time</strong>
+    </div>
+</div>
 
-        <!-- Bootstrap table with striped rows for better readability -->
-        <table class="table table-striped">
-            <!-- Table header with column names -->
-            <thead>
-                <tr>
-                    <th>Sale ID</th>
-                    <th>User</th>
-                    <th>Total Amount</th>
-                    <th>Payment Method</th>
-                    <th>Date</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <!-- Table body with sales data -->
-            <tbody>
-                <!-- Loop through all sales passed from the view (ordered by created_at descending) -->
-                {% for sale in sales %}
+<!-- Filters Section -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h6 class="mb-0"><i class="fas fa-filter me-2"></i>Filters</h6>
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label for="start_date" class="form-label">Start Date</label>
+                <input type="date" class="form-control" id="start_date" name="start_date" value="{{ start_date }}">
+            </div>
+            <div class="col-md-3">
+                <label for="end_date" class="form-label">End Date</label>
+                <input type="date" class="form-control" id="end_date" name="end_date" value="{{ end_date }}">
+            </div>
+            <div class="col-md-3">
+                <label for="payment_method" class="form-label">Payment Method</label>
+                <select class="form-select" id="payment_method" name="payment_method">
+                    <option value="">All Methods</option>
+                    {% for method in payment_methods %}
+                        <option value="{{ method }}" {% if payment_method == method %}selected{% endif %}>
+                            {{ method|title }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="user" class="form-label">Cashier</label>
+                <select class="form-select" id="user" name="user">
+                    <option value="">All Cashiers</option>
+                    {% for user in users %}
+                        <option value="{{ user }}" {% if user_filter == user %}selected{% endif %}>
+                            {{ user }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="fas fa-search me-1"></i>Apply Filters
+                </button>
+                <a href="{% url 'pos_app:sales_report' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-times me-1"></i>Clear Filters
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Key metrics cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <i class="fas fa-receipt fa-2x text-primary mb-2"></i>
+                <h4 class="card-title mb-1">{{ sales|length }}</h4>
+                <small class="text-muted">Total Sales</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <i class="fas fa-peso-sign fa-2x text-success mb-2"></i>
+                <h4 class="card-title mb-1">₱{{ total_sales|floatformat:2 }}</h4>
+                <small class="text-muted">Total Revenue</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <i class="fas fa-calculator fa-2x text-info mb-2"></i>
+                <h4 class="card-title mb-1">
+                    {% if sales %}
+                        ₱{{ average_sale|floatformat:2 }}
+                    {% else %}
+                        ₱0.00
+                    {% endif %}
+                </h4>
+                <small class="text-muted">Average Sale</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <i class="fas fa-calendar-day fa-2x text-warning mb-2"></i>
+                <h4 class="card-title mb-1">
+                    {% if sales %}
+                        {{ sales.0.created_at|date:"M j, Y" }}
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </h4>
+                <small class="text-muted">Last Sale</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sales table -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-list me-2"></i>Sales Transactions</h5>
+        <div class="btn-group" role="group">
+            <div class="dropdown">
+                <button class="btn btn-sm btn-outline-success dropdown-toggle" type="button" id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-download me-1"></i>Export
+                </button>
+                <ul class="dropdown-menu" aria-labelledby="exportDropdown">
+                    <li><a class="dropdown-item" href="?{% for key, value in request.GET.items %}{% if key != 'export' %}{{ key }}={{ value }}&{% endif %}{% endfor %}export=csv">
+                        <i class="fas fa-file-csv me-2"></i>Export as CSV
+                    </a></li>
+                    <li><a class="dropdown-item" href="?{% for key, value in request.GET.items %}{% if key != 'export' %}{{ key }}={{ value }}&{% endif %}{% endfor %}export=pdf">
+                        <i class="fas fa-file-pdf me-2"></i>Export as PDF
+                    </a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <!-- Make table responsive for mobile devices -->
+        <div class="table-responsive">
+            <!-- Bootstrap table with hover effect for better UX -->
+            <table class="table table-hover">
+                <!-- Table header with column names -->
+                <thead class="table-light">
                     <tr>
-                        <!-- Display sale ID -->
-                        <td>{{ sale.id }}</td>
-                        <!-- Display username of the user who processed the sale -->
-                        <td>{{ sale.user.username }}</td>
-                        <!-- Display total amount of the sale -->
-                        <td>₱{{ sale.total_amount }}</td>
-                        <!-- Use Django's get_FOO_display method to show human-readable payment method -->
-                        <td>{{ sale.get_payment_method_display }}</td>
-                        <!-- Display sale creation date -->
-                        <td>{{ sale.created_at }}</td>
-                        <!-- Actions column with link to view sale details -->
-                        <td>
-                            <a href="{% url 'pos_app:sale_detail' sale.pk %}" class="btn btn-sm btn-info">View Details</a>
-                        </td>
+                        <th><i class="fas fa-hashtag me-1"></i>Sale ID</th>
+                        <th><i class="fas fa-user me-1"></i>Cashier</th>
+                        <th><i class="fas fa-peso-sign me-1"></i>Amount</th>
+                        <th><i class="fas fa-credit-card me-1"></i>Payment</th>
+                        <th><i class="fas fa-calendar me-1"></i>Date & Time</th>
+                        <th><i class="fas fa-cogs me-1"></i>Actions</th>
                     </tr>
-                <!-- Empty clause for when there are no sales -->
-                {% empty %}
-                    <tr>
-                        <!-- Display message when no sales exist, spanning all 6 columns -->
-                        <td colspan="6" class="text-center">No sales recorded.</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                </thead>
+                <!-- Table body with sales data -->
+                <tbody>
+                    <!-- Loop through all sales passed from the view (ordered by created_at descending) -->
+                    {% for sale in sales %}
+                        <tr>
+                            <!-- Display sale ID -->
+                            <td>
+                                <strong>#{{ sale.id }}</strong>
+                            </td>
+                            <!-- Display username of the user who processed the sale -->
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-user-circle text-muted me-2"></i>
+                                    {{ sale.user.username }}
+                                </div>
+                            </td>
+                            <!-- Display total amount of the sale -->
+                            <td>
+                                <strong class="text-success">₱{{ sale.total_amount|floatformat:2 }}</strong>
+                            </td>
+                            <!-- Use Django's get_FOO_display method to show human-readable payment method -->
+                            <td>
+                                {% if sale.payment_method == 'cash' %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-money-bill-wave me-1"></i>Cash
+                                    </span>
+                                {% elif sale.payment_method == 'card' %}
+                                    <span class="badge bg-info">
+                                        <i class="fas fa-credit-card me-1"></i>Card
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary">
+                                        <i class="fas fa-question me-1"></i>{{ sale.get_payment_method_display }}
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <!-- Display sale creation date -->
+                            <td>
+                                <div>
+                                    <strong>{{ sale.created_at|date:"M j, Y" }}</strong>
+                                    <br>
+                                    <small class="text-muted">{{ sale.created_at|time:"g:i A" }}</small>
+                                </div>
+                            </td>
+                            <!-- Actions column with link to view sale details -->
+                            <td>
+                                <a href="{% url 'pos_app:sale_detail' sale.pk %}" class="btn btn-sm btn-outline-primary" title="View Details">
+                                    <i class="fas fa-eye me-1"></i>View
+                                </a>
+                            </td>
+                        </tr>
+                    <!-- Empty clause for when there are no sales -->
+                    {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-5">
+                                <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
+                                <h5 class="text-muted">No sales recorded yet</h5>
+                                <p class="text-muted">Sales transactions will appear here once you start processing orders.</p>
+                                <a href="{% url 'pos_app:sale_process' %}" class="btn btn-primary">
+                                    <i class="fas fa-plus me-2"></i>Process First Sale
+                                </a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 {% endblock %}
