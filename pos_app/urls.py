@@ -21,6 +21,8 @@ urlpatterns = [
     path('sale/add/<int:product_id>/', views.add_to_cart, name='add_to_cart'),
     # Remove product from cart - requires login
     path('sale/remove/<int:product_id>/', views.remove_from_cart, name='remove_from_cart'),
+    # Sale confirmation page - requires login
+    path('sale/confirm/', views.sale_confirm, name='sale_confirm'),
     # Sale detail page - requires login
     path('sale/<int:pk>/', views.sale_detail, name='sale_detail'),
     # Sales reports page - requires login

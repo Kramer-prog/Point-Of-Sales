@@ -13,7 +13,7 @@
         <!-- Main heading for the page -->
         <h2>Sales Report</h2>
         <!-- Display total sales amount calculated in the view -->
-        <p><strong>Total Sales:</strong> ${{ total_sales }}</p>
+        <p><strong>Total Sales:</strong> ₱{{ total_sales }}</p>
 
         <!-- Bootstrap table with striped rows for better readability -->
         <table class="table table-striped">
@@ -38,7 +38,7 @@
                         <!-- Display username of the user who processed the sale -->
                         <td>{{ sale.user.username }}</td>
                         <!-- Display total amount of the sale -->
-                        <td>${{ sale.total_amount }}</td>
+                        <td>₱{{ sale.total_amount }}</td>
                         <!-- Use Django's get_FOO_display method to show human-readable payment method -->
                         <td>{{ sale.get_payment_method_display }}</td>
                         <!-- Display sale creation date -->

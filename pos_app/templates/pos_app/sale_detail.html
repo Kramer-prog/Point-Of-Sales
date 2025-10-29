@@ -18,7 +18,7 @@
         <p><strong>User:</strong> {{ sale.user.username }}</p>
         <!-- Use Django's get_FOO_display method to show human-readable payment method -->
         <p><strong>Payment Method:</strong> {{ sale.get_payment_method_display }}</p>
-        <p><strong>Total Amount:</strong> ${{ sale.total_amount }}</p>
+        <p><strong>Total Amount:</strong> ₱{{ sale.total_amount }}</p>
 
         <!-- Section heading for sale items -->
         <h3>Items</h3>
@@ -43,9 +43,9 @@
                         <!-- Display quantity purchased -->
                         <td>{{ item.quantity }}</td>
                         <!-- Display unit price at time of sale -->
-                        <td>${{ item.unit_price }}</td>
+                        <td>₱{{ item.unit_price }}</td>
                         <!-- Display total price for this line item -->
-                        <td>${{ item.total_price }}</td>
+                        <td>₱{{ item.total_price }}</td>
                     </tr>
                 {% endfor %}
             </tbody>

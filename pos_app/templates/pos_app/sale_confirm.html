@@ -1,0 +1,80 @@
+<!-- Extend the base template to inherit common layout and navigation -->
+{% extends 'pos_app/base.html' %}
+
+<!-- Set the page title for the browser tab -->
+{% block title %}Confirm Sale - POS System{% endblock %}
+
+<!-- Main content block that will be inserted into the base template -->
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="card-title mb-0">Order Summary & Confirmation</h3>
+                </div>
+                <div class="card-body">
+                    <h4 class="mb-3">Items in Cart:</h4>
+
+                    <!-- Display cart items -->
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Quantity</th>
+                                    <th>Unit Price</th>
+                                    <th>Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in cart_items %}
+                                <tr>
+                                    <td>{{ item.product.name }}</td>
+                                    <td>{{ item.quantity }}</td>
+                                    <td>₱{{ item.product.price }}</td>
+                                    <td>₱{{ item.subtotal }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Display total -->
+                    <div class="row mt-3">
+                        <div class="col-md-6 offset-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h4 class="mb-0">Total: ₱{{ total }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Confirmation form -->
+                    <form method="post" class="mt-4">
+                        <!-- Django CSRF protection token -->
+                        {% csrf_token %}
+
+                        <!-- Payment method selection -->
+                        <div class="mb-3">
+                            <label for="payment_method" class="form-label"><strong>Payment Method:</strong></label>
+                            <select class="form-select" id="payment_method" name="payment_method" required>
+                                <option value="cash">Cash</option>
+                                <option value="card">Card</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+
+                        <!-- Action buttons -->
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'pos_app:sale_process' %}" class="btn btn-secondary">Back to Cart</a>
+                            <button type="submit" class="btn btn-success btn-lg">Confirm & Complete Sale</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

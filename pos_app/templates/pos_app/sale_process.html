@@ -11,6 +11,27 @@
     <!-- Left column (8/12 width) - displays available products -->
     <div class="col-md-8">
         <h2>Available Products</h2>
+        <!-- Category selection and search bar -->
+        <div class="mb-3">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label for="category" class="form-label">Category</label>
+                    <select class="form-select" id="category" name="category" onchange="this.form.submit()">
+                        <option value="">All Categories</option>
+                        {% for category in categories %}
+                            <option value="{{ category.pk }}" {% if category.pk|stringformat:"s" == selected_category %}selected{% endif %}>{{ category.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label for="search" class="form-label">Search</label>
+                    <input type="text" class="form-control" id="search" name="search" value="{{ search_query }}" placeholder="Search by name or barcode">
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary">Search</button>
+                </div>
+            </form>
+        </div>
         <!-- Grid layout for product cards -->
         <div class="row">
             <!-- Loop through all products passed from the view -->
@@ -22,11 +43,11 @@
                             <!-- Display product name as card title -->
                             <h5 class="card-title">{{ product.name }}</h5>
                             <!-- Display product price -->
-                            <p class="card-text">${{ product.price }}</p>
+                            <p class="card-text">₱{{ product.price }}</p>
                             <!-- Display current stock quantity -->
                             <p class="card-text">Stock: {{ product.stock_quantity }}</p>
                             <!-- Link to add product to cart - calls add_to_cart view -->
-                            <a href="{% url 'pos_app:add_to_cart' product.pk %}" class="btn btn-primary">Add to Cart</a>
+                            <a href="{% url 'pos_app:add_to_cart' product.pk %}{% if selected_category or search_query %}?{% if selected_category %}category={{ selected_category }}{% endif %}{% if selected_category and search_query %}&{% endif %}{% if search_query %}search={{ search_query }}{% endif %}{% endif %}" class="btn btn-primary">Add to Cart</a>
                         </div>
                     </div>
                 </div>
@@ -47,28 +68,21 @@
                         <!-- Display product name and quantity -->
                         {{ item.product.name }} x{{ item.quantity }}
                         <!-- Display subtotal for this item -->
-                        <span class="badge bg-primary rounded-pill">${{ item.subtotal }}</span>
+                        <span class="badge bg-primary rounded-pill">₱{{ item.subtotal }}</span>
                         <!-- Link to remove item from cart - calls remove_from_cart view -->
-                        <a href="{% url 'pos_app:remove_from_cart' item.product.pk %}" class="btn btn-sm btn-danger">Remove</a>
+                        <a href="{% url 'pos_app:remove_from_cart' item.product.pk %}{% if selected_category or search_query %}?{% if selected_category %}category={{ selected_category }}{% endif %}{% if selected_category and search_query %}&{% endif %}{% if search_query %}search={{ search_query }}{% endif %}{% endif %}" class="btn btn-sm btn-danger">Remove</a>
                     </div>
                 {% endfor %}
             </div>
             <!-- Display total amount for all cart items -->
-            <h4>Total: ${{ total }}</h4>
-            <!-- Form to complete the sale - submits to same view with POST -->
+            <h4>Total: ₱{{ total }}</h4>
+            <!-- Form to show confirmation page -->
             <form method="post">
                 <!-- Django CSRF protection token -->
                 {% csrf_token %}
-                <!-- Payment method selection dropdown -->
-                <div class="mb-3">
-                    <label for="payment_method" class="form-label">Payment Method</label>
-                    <select class="form-select" id="payment_method" name="payment_method">
-                        <option value="cash">Cash</option>
-                        <option value="card">Card</option>
-                        <option value="other">Other</option>
-                    </select>
-                </div>
-                <!-- Submit button to complete the sale transaction -->
+                <!-- Hidden field to indicate confirmation request -->
+                <input type="hidden" name="show_confirmation" value="1">
+                <!-- Submit button to show confirmation page -->
                 <button type="submit" class="btn btn-success">Complete Sale</button>
             </form>
         {% else %}
