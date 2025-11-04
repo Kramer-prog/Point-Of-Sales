@@ -1,0 +1,883 @@
+POS SYSTEM CODE REVIEWER
+========================
+
+This document explains every import, process, and important functionality in the POS (Point of Sale) Django application.
+It covers models.py, views.py, urls.py, and admin.py files to help with review and debugging.
+Code snippets are included to show the actual implementation.
+
+OVERVIEW OF THE POS SYSTEM
+--------------------------
+The POS system is a Django web application for managing retail sales. It includes:
+- Product and category management
+- User authentication and registration
+- Shopping cart functionality
+- Sale processing with inventory updates
+- Sales reporting and admin interface
+- Stock tracking and alerts
+
+The system uses Django's built-in authentication, sessions for cart management, and database transactions for sale integrity.
+
+MODELS.PY EXPLANATION
+=====================
+
+IMPORTS:
+--------
+```python
+from django.db import models
+from django.contrib.auth.models import User
+```
+
+from django.db import models
+    - Provides base Model class and field types for database models
+    - Enables creation of database tables and relationships
+
+from django.contrib.auth.models import User
+    - Imports Django's built-in User model for authentication
+    - Used for linking sales to specific users
+
+MODELS AND PROCESSES:
+---------------------
+
+1. Category Model:
+   - Represents product categories (e.g., "Electronics", "Clothing")
+   - Fields: name (unique), description (optional)
+   - Process: Used to organize products hierarchically
+   - __str__ method returns category name for display
+
+   Code:
+   ```python
+   class Category(models.Model):
+       name = models.CharField(max_length=100, unique=True)
+       description = models.TextField(blank=True)
+
+       def __str__(self):
+           return self.name
+   ```
+
+2. Product Model:
+   - Represents individual products for sale
+   - Fields: name, category (foreign key), price, cost_price, stock_quantity, barcode (optional), description (optional), timestamps
+   - Process: Core inventory item with pricing and stock tracking
+   - Foreign key to Category ensures products belong to categories
+   - Timestamps track creation and updates automatically
+
+   Code:
+   ```python
+   class Product(models.Model):
+       name = models.CharField(max_length=200)
+       category = models.ForeignKey(Category, on_delete=models.CASCADE)
+       price = models.DecimalField(max_digits=10, decimal_places=2)
+       cost_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+       stock_quantity = models.PositiveIntegerField(default=0)
+       barcode = models.CharField(max_length=100, unique=True, blank=True)
+       description = models.TextField(blank=True)
+       created_at = models.DateTimeField(auto_now_add=True)
+       updated_at = models.DateTimeField(auto_now=True)
+
+       def __str__(self):
+           return self.name
+   ```
+
+3. Sale Model:
+   - Represents completed sales transactions
+   - Fields: user (who made sale), total_amount, payment_method (cash/card/other), created_at
+   - Process: Records the overall sale transaction
+   - Links to User for accountability
+   - Payment method choices ensure data consistency
+
+   Code:
+   ```python
+   class Sale(models.Model):
+       user = models.ForeignKey(User, on_delete=models.CASCADE)
+       total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+       payment_method = models.CharField(max_length=50, choices=[
+           ('cash', 'Cash'),
+           ('card', 'Card'),
+           ('other', 'Other')
+       ], default='cash')
+       created_at = models.DateTimeField(auto_now_add=True)
+
+       def __str__(self):
+           return f"Sale #{self.id} - {self.total_amount}"
+   ```
+
+4. SaleItem Model:
+   - Represents individual items within a sale
+   - Fields: sale (foreign key), product (foreign key), quantity, unit_price, total_price
+   - Process: Breaks down sales into individual product lines
+   - Related name 'items' allows reverse lookup from Sale
+   - Calculates total_price as quantity * unit_price
+
+   Code:
+   ```python
+   class SaleItem(models.Model):
+       sale = models.ForeignKey(Sale, on_delete=models.CASCADE, related_name='items')
+       product = models.ForeignKey(Product, on_delete=models.CASCADE)
+       quantity = models.PositiveIntegerField()
+       unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+       total_price = models.DecimalField(max_digits=10, decimal_places=2)
+
+       def __str__(self):
+           return f"{self.product.name} x{self.quantity}"
+   ```
+
+5. Inventory Model:
+   - One-to-one relationship with Product for stock tracking
+   - Fields: product, quantity, last_updated
+   - Process: Provides detailed inventory management
+   - Auto-updates timestamp on changes
+   - Separate from Product.stock_quantity for flexibility
+
+   Code:
+   ```python
+   class Inventory(models.Model):
+       product = models.OneToOneField(Product, on_delete=models.CASCADE)
+       quantity = models.PositiveIntegerField(default=0)
+       last_updated = models.DateTimeField(auto_now=True)
+
+       def __str__(self):
+           return f"{self.product.name} - {self.quantity}"
+   ```
+
+VIEWS.PY EXPLANATION
+====================
+
+IMPORTS:
+--------
+```python
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.db import transaction, models
+from django.http import JsonResponse
+from django.urls import reverse
+from .models import Product, Category, Sale, SaleItem
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth import login
+```
+
+from django.shortcuts import render, get_object_or_404, redirect
+    - render: Displays templates with context data
+    - get_object_or_404: Gets database objects or returns 404 error
+    - redirect: Redirects users to other URLs
+
+from django.contrib.auth.decorators import login_required
+    - Decorator that requires user authentication for views
+
+from django.contrib import messages
+    - Framework for displaying success/error messages to users
+
+from django.db import transaction, models
+    - transaction: Ensures database operations are atomic (all-or-nothing)
+    - models: Provides Q objects for complex queries
+
+from django.http import JsonResponse
+    - Returns JSON responses for AJAX requests
+
+from django.urls import reverse
+    - Generates URLs from view names and parameters
+
+from .models import Product, Category, Sale, SaleItem
+    - Imports all models for database operations
+
+from django.contrib.auth.forms import UserCreationForm
+    - Built-in form for user registration
+
+from django.contrib.auth import login
+    - Function to log in users after registration
+
+VIEW FUNCTIONS AND PROCESSES:
+-----------------------------
+
+1. home(request):
+   - Process: Displays dashboard with statistics
+   - Gets all products, categories, sales, calculates total sales
+   - No login required - public access
+   - Renders home.html template
+
+   Code:
+   ```python
+   def home(request):
+       products = Product.objects.all()
+       categories = Category.objects.all()
+       sales = Sale.objects.all()
+       total_sales = sum(sale.total_amount for sale in sales)
+       return render(request, 'pos_app/home.html', {
+           'products': products,
+           'categories': categories,
+           'sales': sales,
+           'total_sales': total_sales
+       })
+   ```
+
+2. product_list(request):
+   - Process: Shows all products in a list
+   - Requires login
+   - Renders product_list.html
+
+   Code:
+   ```python
+   @login_required
+   def product_list(request):
+       products = Product.objects.all()
+       return render(request, 'pos_app/product_list.html', {'products': products})
+   ```
+
+3. product_detail(request, pk):
+   - Process: Shows detailed view of single product
+   - Uses get_object_or_404 for error handling
+   - Requires login
+
+   Code:
+   ```python
+   @login_required
+   def product_detail(request, pk):
+       product = get_object_or_404(Product, pk=pk)
+       return render(request, 'pos_app/product_detail.html', {'product': product})
+   ```
+
+4. sale_process(request):
+   - IMPORTANT PROCESS: Main sales interface
+   - GET: Displays products, categories, cart items, handles filtering/searching
+   - POST: Handles two actions:
+     - 'confirm_sale': Processes the actual sale (similar to sale_confirm)
+     - 'show_confirmation': Redirects to confirmation page
+   - Process flow:
+     - Filter products by category/search
+     - Display cart contents with subtotals
+     - Calculate total amount
+   - Requires login
+
+   Code:
+   ```python
+   @login_required
+   def sale_process(request):
+       if request.method == 'POST':
+           if 'confirm_sale' in request.POST:
+               cart = request.session.get('cart', {})
+               if not cart:
+                   messages.error(request, 'Cart is empty')
+                   return redirect('pos_app:sale_process')
+               # ... sale processing logic (similar to sale_confirm)
+           elif 'show_confirmation' in request.POST:
+               return redirect('pos_app:sale_confirm')
+
+       category_id = request.GET.get('category')
+       search_query = request.GET.get('search', '').strip()
+       products = Product.objects.all()
+       if category_id and category_id != 'None' and category_id.isdigit():
+           products = products.filter(category_id=int(category_id))
+       if search_query:
+           products = products.filter(
+               models.Q(name__icontains=search_query) | models.Q(barcode__icontains=search_query)
+           )
+
+       categories = Category.objects.all()
+       cart = request.session.get('cart', {})
+       cart_items = []
+       total = 0
+       for product_id, quantity in cart.items():
+           product = get_object_or_404(Product, pk=product_id)
+           subtotal = product.price * quantity
+           total += subtotal
+           cart_items.append({
+               'product': product,
+               'quantity': quantity,
+               'subtotal': subtotal
+           })
+
+       return render(request, 'pos_app/sale_process.html', {
+           'products': products,
+           'categories': categories,
+           'selected_category': category_id,
+           'search_query': search_query,
+           'cart_items': cart_items,
+           'total': total
+       })
+   ```
+
+5. add_to_cart(request, product_id):
+   - Process: Adds products to session-based shopping cart
+   - Supports both AJAX and regular HTTP requests
+   - Increments quantity if product already in cart
+   - Returns JSON for AJAX, redirects for regular requests
+   - Requires login
+
+   Code:
+   ```python
+   @login_required
+   def add_to_cart(request, product_id):
+       if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+           product = get_object_or_404(Product, pk=product_id)
+           cart = request.session.get('cart', {})
+           cart[str(product_id)] = cart.get(str(product_id), 0) + 1
+           request.session['cart'] = cart
+           return JsonResponse({
+               'success': True,
+               'message': f'{product.name} added to cart',
+               'cart_count': len(cart)
+           })
+       else:
+           product = get_object_or_404(Product, pk=product_id)
+           cart = request.session.get('cart', {})
+           cart[str(product_id)] = cart.get(str(product_id), 0) + 1
+           request.session['cart'] = cart
+           category = request.GET.get('category', '')
+           search = request.GET.get('search', '')
+           base_url = reverse('pos_app:sale_process')
+           params = []
+           if category:
+               params.append(f'category={category}')
+           if search:
+               params.append(f'search={search}')
+           params.append(f'item_added={product.name}')
+           query_string = '?' + '&'.join(params) if params else ''
+           return redirect(base_url + query_string)
+   ```
+
+6. remove_from_cart(request, product_id):
+   - Process: Removes specific product from cart
+   - Supports AJAX and regular requests
+   - Updates session cart
+   - Requires login
+
+   Code:
+   ```python
+   @login_required
+   def remove_from_cart(request, product_id):
+       if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+           cart = request.session.get('cart', {})
+           if str(product_id) in cart:
+               del cart[str(product_id)]
+               request.session['cart'] = cart
+               return JsonResponse({
+                   'success': True,
+                   'message': 'Item removed from cart',
+                   'cart_count': len(cart)
+               })
+           else:
+               return JsonResponse({
+                   'success': False,
+                   'message': 'Item not found in cart'
+               })
+       else:
+           cart = request.session.get('cart', {})
+           if str(product_id) in cart:
+               del cart[str(product_id)]
+               request.session['cart'] = cart
+               messages.success(request, 'Item removed from cart')
+           category = request.GET.get('category', '')
+           search = request.GET.get('search', '')
+           return redirect(reverse('pos_app:sale_process') + f'?category={category}&search={search}' if category or search else reverse('pos_app:sale_process'))
+   ```
+
+7. clear_cart(request):
+   - Process: Empties entire cart
+   - Supports AJAX and regular requests
+   - Requires login
+
+   Code:
+   ```python
+   @login_required
+   def clear_cart(request):
+       if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+           request.session['cart'] = {}
+           return JsonResponse({
+               'success': True,
+               'message': 'Cart cleared successfully',
+               'cart_count': 0
+           })
+       else:
+           request.session['cart'] = {}
+           messages.success(request, 'Cart cleared successfully')
+           return redirect('pos_app:sale_process')
+   ```
+
+8. sale_confirm(request):
+   - IMPORTANT PROCESS: Sale confirmation and processing
+   - GET: Shows cart summary for final review
+   - POST: Actually processes the sale
+   - Process flow:
+     - Validate cart not empty
+     - Check stock availability for all items
+     - Use database transaction for atomicity
+     - Create Sale record
+     - Create SaleItem records for each product
+     - Update product stock quantities
+     - Clear cart from session
+     - Redirect to sale detail
+   - Requires login
+
+   Code:
+   ```python
+   @login_required
+   def sale_confirm(request):
+       cart = request.session.get('cart', {})
+       if not cart:
+           messages.error(request, 'Cart is empty')
+           return redirect('pos_app:sale_process')
+
+       cart_items = []
+       total = 0
+       for product_id, quantity in cart.items():
+           product = get_object_or_404(Product, pk=product_id)
+           subtotal = product.price * quantity
+           total += subtotal
+           cart_items.append({
+               'product': product,
+               'quantity': quantity,
+               'subtotal': subtotal
+           })
+
+       if request.method == 'POST':
+           total_amount = 0
+           sale_items = []
+           for product_id, quantity in cart.items():
+               product = get_object_or_404(Product, pk=product_id)
+               if product.stock_quantity < quantity:
+                   messages.error(request, f'Insufficient stock for {product.name}')
+                   return redirect('pos_app:sale_process')
+               unit_price = product.price
+               total_price = unit_price * quantity
+               total_amount += total_price
+               sale_items.append({
+                   'product': product,
+                   'quantity': quantity,
+                   'unit_price': unit_price,
+                   'total_price': total_price
+               })
+
+           with transaction.atomic():
+               sale = Sale.objects.create(
+                   user=request.user,
+                   total_amount=total_amount,
+                   payment_method=request.POST.get('payment_method', 'cash')
+               )
+               for item in sale_items:
+                   SaleItem.objects.create(
+                       sale=sale,
+                       product=item['product'],
+                       quantity=item['quantity'],
+                       unit_price=item['unit_price'],
+                       total_price=item['total_price']
+                   )
+                   item['product'].stock_quantity -= item['quantity']
+                   item['product'].save()
+
+           request.session['cart'] = {}
+           messages.success(request, f'Sale completed successfully! Total: ₱{total_amount}')
+           return redirect('pos_app:sale_detail', pk=sale.pk)
+
+       return render(request, 'pos_app/sale_confirm.html', {
+           'cart_items': cart_items,
+           'total': total
+       })
+   ```
+
+9. sale_detail(request, pk):
+   - Process: Shows completed sale details
+   - Displays sale information and items
+   - Requires login
+
+   Code:
+   ```python
+   @login_required
+   def sale_detail(request, pk):
+       sale = get_object_or_404(Sale, pk=pk)
+       return render(request, 'pos_app/sale_detail.html', {'sale': sale})
+   ```
+
+10. sales_report(request):
+    - Process: Shows all sales with statistics
+    - Calculates total and average sale amounts
+    - Orders sales by date (newest first)
+    - Requires login
+
+    Code:
+    ```python
+    @login_required
+    def sales_report(request):
+        sales = Sale.objects.all().order_by('-created_at')
+        total_sales = sum(sale.total_amount for sale in sales)
+        average_sale = total_sales / len(sales) if sales else 0
+        return render(request, 'pos_app/sales_report.html', {
+            'sales': sales,
+            'total_sales': total_sales,
+            'average_sale': average_sale
+        })
+    ```
+
+11. register(request):
+    - Process: User registration
+    - GET: Shows registration form
+    - POST: Validates and creates new user, logs them in
+    - No login required
+    - Uses Django's UserCreationForm
+
+    Code:
+    ```python
+    def register(request):
+        if request.method == 'POST':
+            form = UserCreationForm(request.POST)
+            if form.is_valid():
+                user = form.save()
+                login(request, user)
+                messages.success(request, 'Registration successful!')
+                return redirect('pos_app:home')
+            else:
+                messages.error(request, 'Registration failed. Please check the form.')
+        else:
+            form = UserCreationForm()
+        return render(request, 'pos_app/register.html', {'form': form})
+    ```
+
+URLS.PY (APP LEVEL) EXPLANATION
+===============================
+
+IMPORTS:
+--------
+```python
+from django.urls import path
+from . import views
+```
+
+from django.urls import path
+    - Provides path() function for URL routing
+
+from . import views
+    - Imports views from current app
+
+URL PATTERNS:
+-------------
+app_name = 'pos_app'  # Namespace to avoid URL conflicts
+
+Code:
+```python
+urlpatterns = [
+    path('', views.home, name='home'),
+    path('register/', views.register, name='register'),
+    path('products/', views.product_list, name='product_list'),
+    path('products/<int:pk>/', views.product_detail, name='product_detail'),
+    path('sale/', views.sale_process, name='sale_process'),
+    path('sale/add/<int:product_id>/', views.add_to_cart, name='add_to_cart'),
+    path('sale/remove/<int:product_id>/', views.remove_from_cart, name='remove_from_cart'),
+    path('sale/clear/', views.clear_cart, name='clear_cart'),
+    path('sale/confirm/', views.sale_confirm, name='sale_confirm'),
+    path('sale/<int:pk>/', views.sale_detail, name='sale_detail'),
+    path('reports/sales/', views.sales_report, name='sales_report'),
+]
+```
+
+URL patterns map URLs to view functions:
+- '' -> home (dashboard)
+- 'register/' -> register (user registration)
+- 'products/' -> product_list (product catalog)
+- 'products/<int:pk>/' -> product_detail (individual product)
+- 'sale/' -> sale_process (main sales interface)
+- 'sale/add/<int:product_id>/' -> add_to_cart
+- 'sale/remove/<int:product_id>/' -> remove_from_cart
+- 'sale/clear/' -> clear_cart
+- 'sale/confirm/' -> sale_confirm
+- 'sale/<int:pk>/' -> sale_detail
+- 'reports/sales/' -> sales_report
+
+URLS.PY (PROJECT LEVEL) EXPLANATION
+===================================
+
+IMPORTS:
+--------
+```python
+from django.contrib import admin
+from django.urls import path, include
+from pos_app.admin import admin_site
+```
+
+from django.contrib import admin
+    - Django's admin interface
+
+from django.urls import path, include
+    - path() for routing, include() for including app URLs
+
+from pos_app.admin import admin_site
+    - Custom admin site from pos_app
+
+URL PATTERNS:
+-------------
+Code:
+```python
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('pos-admin/', admin_site.urls),  # Custom professional admin interface
+    path('accounts/', include('django.contrib.auth.urls')),
+    path('', include('pos_app.urls')),
+]
+```
+
+- 'admin/' -> Django's default admin
+- 'pos-admin/' -> Custom POS admin interface
+- 'accounts/' -> Django auth URLs (login, logout, etc.)
+- '' -> Include pos_app.urls (main app URLs)
+
+ADMIN.PY EXPLANATION
+====================
+
+IMPORTS:
+--------
+```python
+from django.contrib import admin
+from django.db.models import Sum, Count
+from django.utils.html import format_html
+from django.urls import reverse
+from .models import Category, Product, Sale, SaleItem, Inventory
+```
+
+from django.contrib import admin
+    - Base admin functionality
+
+from django.db.models import Sum, Count
+    - Aggregation functions for admin statistics
+
+from django.utils.html import format_html
+    - Safe HTML rendering in admin
+
+from django.urls import reverse
+    - URL generation for admin links
+
+from .models import Category, Product, Sale, SaleItem, Inventory
+    - All models for admin registration
+
+ADMIN CONFIGURATIONS:
+---------------------
+
+1. SaleItemInline:
+   - Displays sale items within Sale admin
+   - Tabular inline for better space usage
+   - Shows product, quantity, prices
+
+   Code:
+   ```python
+   class SaleItemInline(admin.TabularInline):
+       model = SaleItem
+       extra = 0
+       readonly_fields = ('total_price',)
+       fields = ('product', 'quantity', 'unit_price', 'total_price')
+   ```
+
+2. CategoryAdmin:
+   - Manages product categories
+   - Custom methods: product_count, total_value
+   - Search by name and description
+
+   Code:
+   ```python
+   @admin.register(Category)
+   class CategoryAdmin(admin.ModelAdmin):
+       list_display = ('name', 'description', 'product_count', 'total_value')
+       search_fields = ('name', 'description')
+
+       def product_count(self, obj):
+           return obj.product_set.count()
+       product_count.short_description = 'Products'
+
+       def total_value(self, obj):
+           total = obj.product_set.aggregate(
+               total=Sum('price') * Sum('stock_quantity')
+           )['total'] or 0
+           return f"₱{total:.2f}"
+       total_value.short_description = 'Total Value'
+   ```
+
+3. ProductAdmin:
+   - Manages products
+   - Custom stock_status with color coding
+   - Actions: mark_out_of_stock, update_stock
+   - Filters and search functionality
+
+   Code:
+   ```python
+   @admin.register(Product)
+   class ProductAdmin(admin.ModelAdmin):
+       list_display = ('name', 'category', 'price', 'stock_quantity', 'stock_status', 'barcode', 'updated_at')
+       list_filter = ('category', 'stock_quantity', 'updated_at')
+       search_fields = ('name', 'barcode', 'category__name')
+       readonly_fields = ('created_at', 'updated_at')
+       ordering = ('-updated_at',)
+       actions = ['mark_out_of_stock', 'update_stock']
+
+       def stock_status(self, obj):
+           if obj.stock_quantity == 0:
+               return format_html('<span style="color: red;">Out of Stock</span>')
+           elif obj.stock_quantity < 10:
+               return format_html('<span style="color: orange;">Low Stock ({})</span>', obj.stock_quantity)
+           else:
+               return format_html('<span style="color: green;">In Stock ({})</span>', obj.stock_quantity)
+       stock_status.short_description = 'Stock Status'
+
+       def mark_out_of_stock(self, request, queryset):
+           queryset.update(stock_quantity=0)
+           self.message_user(request, f"Marked {queryset.count()} products as out of stock.")
+       mark_out_of_stock.short_description = "Mark selected products as out of stock"
+
+       def update_stock(self, request, queryset):
+           self.message_user(request, "Use the change form to update stock quantities individually.")
+       update_stock.short_description = "Update stock (use change form)"
+   ```
+
+4. SaleAdmin:
+   - Manages sales transactions
+   - Includes SaleItemInline
+   - Custom view_details link
+   - Actions: export_sales_data
+
+   Code:
+   ```python
+   @admin.register(Sale)
+   class SaleAdmin(admin.ModelAdmin):
+       list_display = ('id', 'user', 'total_amount', 'payment_method', 'item_count', 'created_at', 'view_details')
+       list_filter = ('payment_method', 'created_at', 'user')
+       search_fields = ('id', 'user__username')
+       readonly_fields = ('created_at', 'total_amount')
+       inlines = [SaleItemInline]
+       actions = ['export_sales_data']
+
+       def item_count(self, obj):
+           return obj.items.count()
+       item_count.short_description = 'Items'
+
+       def view_details(self, obj):
+           return format_html('<a href="{}" class="button">View Details</a>',
+                             reverse('admin:pos_app_sale_change', args=(obj.pk,)))
+       view_details.short_description = 'Details'
+
+       def export_sales_data(self, request, queryset):
+           self.message_user(request, f"Exported {queryset.count()} sales records.")
+       export_sales_data.short_description = "Export selected sales data"
+   ```
+
+5. SaleItemAdmin:
+   - Manages individual sale items
+   - Links back to parent sale
+   - Filters by date and category
+
+   Code:
+   ```python
+   @admin.register(SaleItem)
+   class SaleItemAdmin(admin.ModelAdmin):
+       list_display = ('sale_link', 'product', 'quantity', 'unit_price', 'total_price', 'sale_date')
+       list_filter = ('sale__created_at', 'product__category')
+       search_fields = ('product__name', 'sale__id')
+       readonly_fields = ('total_price',)
+
+       def sale_link(self, obj):
+           return format_html('<a href="{}">Sale #{}</a>',
+                             reverse('admin:pos_app_sale_change', args=(obj.sale.pk,)),
+                             obj.sale.id)
+       sale_link.short_description = 'Sale'
+
+       def sale_date(self, obj):
+           return obj.sale.created_at
+       sale_date.short_description = 'Sale Date'
+       sale_date.admin_order_field = 'sale__created_at'
+   ```
+
+6. InventoryAdmin:
+   - Manages inventory records
+   - Color-coded stock levels
+   - Read-only timestamps
+
+   Code:
+   ```python
+   @admin.register(Inventory)
+   class InventoryAdmin(admin.ModelAdmin):
+       list_display = ('product', 'quantity', 'stock_level', 'last_updated')
+       list_filter = ('last_updated',)
+       search_fields = ('product__name',)
+       readonly_fields = ('last_updated',)
+
+       def stock_level(self, obj):
+           if obj.quantity == 0:
+               return format_html('<span style="color: red;">Critical</span>')
+           elif obj.quantity < 5:
+               return format_html('<span style="color: orange;">Low</span>')
+           elif obj.quantity < 20:
+               return format_html('<span style="color: blue;">Medium</span>')
+           else:
+               return format_html('<span style="color: green;">High</span>')
+       stock_level.short_description = 'Stock Level'
+   ```
+
+7. POSAdminSite:
+   - Custom admin site with professional branding
+   - Custom app ordering
+   - Registers all models with their admins
+
+   Code:
+   ```python
+   class POSAdminSite(admin.AdminSite):
+       site_header = "POS System Administration"
+       site_title = "POS Admin"
+       index_title = "Welcome to POS System Admin"
+
+       def get_app_list(self, request):
+           app_list = super().get_app_list(request)
+           for app in app_list:
+               if app['app_label'] == 'pos_app':
+                   app['models'].sort(key=lambda x: ['Category', 'Product', 'Inventory', 'Sale', 'SaleItem'].index(x['object_name']))
+           return app_list
+
+   admin_site = POSAdminSite(name='pos_admin')
+   admin_site.register(Category, CategoryAdmin)
+   admin_site.register(Product, ProductAdmin)
+   admin_site.register(Sale, SaleAdmin)
+   admin_site.register(SaleItem, SaleItemAdmin)
+   admin_site.register(Inventory, InventoryAdmin)
+   ```
+
+KEY PROCESSES IN THE SYSTEM
+===========================
+
+1. SALE PROCESSING FLOW:
+   - User browses products (sale_process view)
+   - Adds items to cart (add_to_cart)
+   - Reviews cart and confirms (sale_confirm)
+   - System validates stock, creates Sale and SaleItem records
+   - Updates product stock quantities
+   - Clears cart, shows success message
+
+2. CART MANAGEMENT:
+   - Uses Django sessions to store cart data
+   - Cart is dictionary: {product_id: quantity}
+   - Supports add, remove, clear operations
+   - AJAX support for dynamic updates
+
+3. STOCK MANAGEMENT:
+   - Product.stock_quantity updated during sales
+   - Inventory model for detailed tracking
+   - Stock validation before sale completion
+   - Admin interface shows stock status
+
+4. USER AUTHENTICATION:
+   - Django's built-in auth system
+   - Registration through register view
+   - Login required for most operations
+   - Sales linked to authenticated users
+
+5. DATA INTEGRITY:
+   - Database transactions ensure sale atomicity
+   - Stock checks prevent overselling
+   - Foreign key relationships maintain data consistency
+
+6. ADMIN FUNCTIONALITY:
+   - Custom admin site for POS management
+   - Inline editing for related models
+   - Custom actions and filters
+   - Statistical displays in list views
+
+DEBUGGING NOTES:
+----------------
+- Check session data for cart issues
+- Verify database transactions for sale failures
+- Monitor stock quantities after sales
+- Test AJAX endpoints separately
+- Use Django debug toolbar for performance issues
+- Check admin custom methods for calculation errors
